@@ -1,0 +1,922 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>ChromaVision – Anatomía accesible</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:ital,wght@0,300;0,400;0,500;1,300&display=swap" rel="stylesheet"/>
+<style>
+/* ══════════════════════════════════════
+   TOKENS — cambian globalmente al elegir perfil
+══════════════════════════════════════ */
+:root {
+  --bg:        #0b0b18;
+  --surface:   #13132a;
+  --card:      #1a1a35;
+  --border:    rgba(255,255,255,0.08);
+  --text:      #f0eeff;
+  --muted:     rgba(240,238,255,0.45);
+  --accent1:   #7b6fff;
+  --accent2:   #4dffc3;
+  --accent3:   #ff6fb0;
+  --vein:      #7b6fff;
+  --nerve:     #4dffc3;
+  --artery:    #ff6fb0;
+  --filter:    none;
+  --radius:    16px;
+}
+/* Deuteranopia – paleta azul/amarillo */
+[data-mode="deuteranopia"] {
+  --accent1:  #4488ff;
+  --accent2:  #ffe066;
+  --accent3:  #ff8c42;
+  --vein:     #4488ff;
+  --nerve:    #ffe066;
+  --artery:   #ff8c42;
+  --filter:   url(#deut);
+}
+/* Protanopia – paleta cian/magenta */
+[data-mode="protanopia"] {
+  --accent1:  #00c2d4;
+  --accent2:  --accent2;
+  --accent2:  #e040fb;
+  --accent3:  #ffca28;
+  --vein:     #00c2d4;
+  --nerve:    #e040fb;
+  --artery:   #ffca28;
+  --filter:   url(#prot);
+}
+/* Tritanopia – paleta rojo/verde */
+[data-mode="tritanopia"] {
+  --accent1:  #e53935;
+  --accent2:  #43a047;
+  --accent3:  #fb8c00;
+  --vein:     #e53935;
+  --nerve:    #43a047;
+  --artery:   #fb8c00;
+  --filter:   url(#trit);
+}
+
+*,*::before,*::after { box-sizing:border-box; margin:0; padding:0; }
+html { scroll-behavior: smooth; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'DM Sans', sans-serif;
+  font-weight: 400;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* ── NAV ── */
+nav {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+  background: rgba(11,11,24,0.85);
+  backdrop-filter: blur(20px);
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 40px; height: 60px;
+  transition: background 0.3s;
+}
+.nav-logo {
+  font-family: 'Syne', sans-serif;
+  font-weight: 800; font-size: 20px;
+  color: var(--text);
+  display: flex; align-items: center; gap: 8px;
+  cursor: pointer;
+}
+.nav-logo span { color: var(--accent1); }
+.nav-links { display: flex; gap: 28px; align-items: center; }
+.nav-links a {
+  font-size: 13px; color: var(--muted);
+  text-decoration: none; letter-spacing: 0.03em;
+  transition: color 0.2s; cursor: pointer;
+}
+.nav-links a:hover { color: var(--text); }
+.nav-badge {
+  background: var(--accent1);
+  color: #fff; font-size: 10px; font-weight: 600;
+  padding: 3px 10px; border-radius: 20px;
+  letter-spacing: 0.04em; text-transform: uppercase;
+  opacity: 0; transition: opacity 0.3s;
+}
+.nav-badge.visible { opacity: 1; }
+
+/* ── SVG FILTERS (hidden) ── */
+.svg-filters { position: absolute; width: 0; height: 0; overflow: hidden; }
+
+/* ══════════════════════════════════════
+   SECCIÓN 1 — HERO
+══════════════════════════════════════ */
+#hero {
+  min-height: 100vh;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  text-align: center;
+  padding: 100px 40px 60px;
+  position: relative;
+  overflow: hidden;
+}
+.hero-bg {
+  position: absolute; inset: 0; z-index: 0;
+  background: radial-gradient(ellipse 80% 60% at 50% 0%, rgba(123,111,255,0.18) 0%, transparent 70%),
+              radial-gradient(ellipse 50% 40% at 80% 80%, rgba(77,255,195,0.1) 0%, transparent 60%),
+              radial-gradient(ellipse 40% 30% at 20% 70%, rgba(255,111,176,0.1) 0%, transparent 60%);
+  transition: background 0.8s;
+}
+.hero-eyeball {
+  width: 120px; height: 120px; margin: 0 auto 32px; position: relative; z-index: 1;
+}
+.hero-tag {
+  font-size: 11px; font-weight: 500; letter-spacing: 0.15em; text-transform: uppercase;
+  color: var(--accent1); margin-bottom: 16px; position: relative; z-index: 1;
+  transition: color 0.5s;
+}
+h1 {
+  font-family: 'Syne', sans-serif;
+  font-size: clamp(40px, 6vw, 80px);
+  font-weight: 800; line-height: 1.05;
+  letter-spacing: -0.03em;
+  position: relative; z-index: 1;
+  margin-bottom: 20px;
+}
+h1 em { font-style: normal; color: var(--accent1); transition: color 0.5s; }
+.hero-sub {
+  font-size: 17px; color: var(--muted); max-width: 520px;
+  line-height: 1.65; margin-bottom: 40px; position: relative; z-index: 1;
+}
+.btn-primary {
+  display: inline-flex; align-items: center; gap: 8px;
+  background: var(--accent1); color: #fff;
+  font-family: 'Syne', sans-serif; font-weight: 700; font-size: 15px;
+  padding: 14px 32px; border-radius: 50px;
+  border: none; cursor: pointer;
+  transition: transform 0.2s, box-shadow 0.2s, background 0.5s;
+  position: relative; z-index: 1;
+  text-decoration: none;
+}
+.btn-primary:hover { transform: translateY(-2px); box-shadow: 0 12px 40px rgba(123,111,255,0.35); }
+.btn-ghost {
+  display: inline-flex; align-items: center; gap: 8px;
+  background: transparent;
+  color: var(--text); font-family: 'Syne', sans-serif;
+  font-weight: 600; font-size: 14px;
+  padding: 13px 28px; border-radius: 50px;
+  border: 1px solid var(--border); cursor: pointer;
+  transition: border-color 0.2s, background 0.2s;
+  text-decoration: none;
+}
+.btn-ghost:hover { border-color: var(--accent1); background: rgba(255,255,255,0.04); }
+.hero-btns { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; position: relative; z-index: 1; }
+
+.hero-stats {
+  display: flex; gap: 40px; margin-top: 64px;
+  position: relative; z-index: 1;
+  border-top: 1px solid var(--border); padding-top: 40px;
+  flex-wrap: wrap; justify-content: center;
+}
+.stat-num {
+  font-family: 'Syne', sans-serif; font-size: 32px; font-weight: 800;
+  color: var(--accent1); transition: color 0.5s;
+}
+.stat-label { font-size: 12px; color: var(--muted); margin-top: 2px; }
+
+/* ══════════════════════════════════════
+   SECCIÓN 2 — SELECTOR DE DALTONISMO
+══════════════════════════════════════ */
+#selector {
+  padding: 100px 40px;
+  max-width: 960px; margin: 0 auto;
+}
+.section-tag {
+  font-size: 11px; font-weight: 500; letter-spacing: 0.14em;
+  text-transform: uppercase; color: var(--accent1); margin-bottom: 12px;
+  transition: color 0.5s;
+}
+.section-title {
+  font-family: 'Syne', sans-serif; font-size: clamp(28px, 4vw, 48px);
+  font-weight: 800; letter-spacing: -0.02em; margin-bottom: 14px; line-height: 1.1;
+}
+.section-sub { font-size: 16px; color: var(--muted); max-width: 520px; line-height: 1.6; margin-bottom: 48px; }
+
+.mode-cards {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 16px;
+}
+.mode-card {
+  background: var(--card); border: 2px solid var(--border);
+  border-radius: var(--radius); padding: 28px 24px;
+  cursor: pointer; transition: border-color 0.3s, transform 0.2s, box-shadow 0.3s;
+  position: relative; overflow: hidden;
+}
+.mode-card::before {
+  content: ''; position: absolute; inset: 0;
+  background: var(--card-glow, transparent);
+  opacity: 0; transition: opacity 0.3s;
+}
+.mode-card:hover { transform: translateY(-3px); }
+.mode-card.active { border-color: var(--card-color, var(--accent1)); box-shadow: 0 0 0 1px var(--card-color, var(--accent1)), 0 12px 40px rgba(0,0,0,0.3); }
+.mode-card.active::before { opacity: 1; }
+.mode-swatch {
+  width: 100%; height: 8px; border-radius: 4px;
+  margin-bottom: 20px; transition: background 0.4s;
+}
+.mode-name {
+  font-family: 'Syne', sans-serif; font-size: 20px; font-weight: 700;
+  margin-bottom: 6px;
+}
+.mode-desc { font-size: 13px; color: var(--muted); line-height: 1.55; }
+.mode-check {
+  position: absolute; top: 16px; right: 16px;
+  width: 22px; height: 22px; border-radius: 50%;
+  background: var(--card-color, var(--accent1));
+  display: flex; align-items: center; justify-content: center;
+  opacity: 0; transform: scale(0.5); transition: opacity 0.2s, transform 0.2s;
+}
+.mode-card.active .mode-check { opacity: 1; transform: scale(1); }
+.mode-none { --card-color: #7b6fff; --card-glow: rgba(123,111,255,0.05); }
+.mode-deut { --card-color: #4488ff; --card-glow: rgba(68,136,255,0.05); }
+.mode-prot { --card-color: #00c2d4; --card-glow: rgba(0,194,212,0.05); }
+.mode-trit { --card-color: #e53935; --card-glow: rgba(229,57,53,0.05); }
+
+/* ══════════════════════════════════════
+   SECCIÓN 3 — GALERÍA
+══════════════════════════════════════ */
+#galeria {
+  padding: 100px 40px;
+  background: var(--surface);
+  transition: background 0.5s;
+}
+.galeria-inner { max-width: 1100px; margin: 0 auto; }
+.galeria-filters {
+  display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 36px;
+}
+.filter-chip {
+  background: var(--card); border: 1px solid var(--border);
+  color: var(--muted); font-size: 12px; font-weight: 500;
+  padding: 7px 16px; border-radius: 30px; cursor: pointer;
+  transition: all 0.2s;
+}
+.filter-chip:hover { border-color: var(--accent1); color: var(--text); }
+.filter-chip.active { background: var(--accent1); border-color: var(--accent1); color: #fff; }
+.gallery-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 20px;
+}
+.gallery-card {
+  background: var(--card); border-radius: var(--radius);
+  border: 1px solid var(--border); overflow: hidden;
+  transition: transform 0.25s, box-shadow 0.25s;
+  cursor: pointer;
+}
+.gallery-card:hover { transform: translateY(-4px); box-shadow: 0 16px 48px rgba(0,0,0,0.4); }
+.gallery-img {
+  width: 100%; height: 180px;
+  display: flex; align-items: center; justify-content: center;
+  position: relative; overflow: hidden;
+}
+.gallery-img svg { transition: filter 0.5s; }
+.gallery-img svg.filtered { filter: var(--filter); }
+.gallery-info { padding: 16px 18px 20px; }
+.gallery-type {
+  font-size: 10px; font-weight: 600; letter-spacing: 0.1em;
+  text-transform: uppercase; margin-bottom: 6px;
+  transition: color 0.5s;
+}
+.type-vena { color: var(--vein); }
+.type-nervio { color: var(--nerve); }
+.type-arteria { color: var(--artery); }
+.gallery-name { font-family: 'Syne', sans-serif; font-size: 16px; font-weight: 700; margin-bottom: 4px; }
+.gallery-desc { font-size: 12px; color: var(--muted); line-height: 1.5; }
+
+/* ══════════════════════════════════════
+   SECCIÓN 4 — COMPARADOR
+══════════════════════════════════════ */
+#comparador {
+  padding: 100px 40px;
+  max-width: 1100px; margin: 0 auto;
+}
+.comparador-layout {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-top: 48px;
+}
+@media(max-width:700px){ .comparador-layout{ grid-template-columns:1fr; } }
+.comp-panel {
+  background: var(--card); border-radius: var(--radius);
+  border: 1px solid var(--border); overflow: hidden;
+}
+.comp-header {
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--border);
+  font-size: 12px; font-weight: 600; letter-spacing: 0.06em;
+  text-transform: uppercase; color: var(--muted);
+  display: flex; align-items: center; gap: 8px;
+}
+.comp-dot { width: 8px; height: 8px; border-radius: 50%; }
+.comp-img {
+  width: 100%; height: 260px;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--bg); position: relative; overflow: hidden;
+}
+.comp-img svg { width: 80%; height: 80%; }
+.comp-label {
+  padding: 14px 20px; font-size: 13px; color: var(--muted); line-height: 1.5;
+}
+.comp-select-wrap { margin-top: 32px; display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+.comp-select {
+  background: var(--card); border: 1px solid var(--border);
+  color: var(--text); font-family: 'DM Sans', sans-serif;
+  font-size: 13px; padding: 10px 16px; border-radius: 10px;
+  cursor: pointer; outline: none;
+}
+.comp-select:focus { border-color: var(--accent1); }
+
+/* ══════════════════════════════════════
+   SECCIÓN 5 — SIMULADOR
+══════════════════════════════════════ */
+#simulador {
+  padding: 100px 40px;
+  background: var(--surface);
+  transition: background 0.5s;
+}
+.sim-inner { max-width: 900px; margin: 0 auto; }
+.sim-upload {
+  border: 2px dashed var(--border); border-radius: var(--radius);
+  padding: 48px 32px; text-align: center;
+  cursor: pointer; transition: border-color 0.2s, background 0.2s;
+  margin-bottom: 32px; position: relative;
+}
+.sim-upload:hover { border-color: var(--accent1); background: rgba(123,111,255,0.04); }
+.sim-upload input { position: absolute; inset: 0; opacity: 0; cursor: pointer; width:100%; }
+.sim-icon { font-size: 36px; margin-bottom: 12px; }
+.sim-upload-title { font-family: 'Syne', sans-serif; font-size: 18px; font-weight: 700; margin-bottom: 6px; }
+.sim-upload-sub { font-size: 13px; color: var(--muted); }
+.sim-results {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px; display: none;
+}
+.sim-results.visible { display: grid; }
+.sim-result-card {
+  background: var(--card); border-radius: var(--radius);
+  border: 1px solid var(--border); overflow: hidden;
+}
+.sim-result-img {
+  width: 100%; height: 160px; object-fit: cover; display: block;
+}
+.sim-result-label {
+  padding: 12px 14px; font-size: 12px; font-weight: 600;
+  letter-spacing: 0.05em; color: var(--muted); text-transform: uppercase;
+}
+
+/* ══════════════════════════════════════
+   SECCIÓN 6 — ACERCA DE
+══════════════════════════════════════ */
+#acerca {
+  padding: 100px 40px;
+  max-width: 960px; margin: 0 auto;
+}
+.about-grid {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-top: 48px;
+}
+@media(max-width:640px){ .about-grid{ grid-template-columns:1fr; } }
+.about-card {
+  background: var(--card); border-radius: var(--radius);
+  border: 1px solid var(--border); padding: 28px 24px;
+  transition: border-color 0.3s;
+}
+.about-card:hover { border-color: var(--accent1); }
+.about-icon { font-size: 28px; margin-bottom: 14px; }
+.about-title { font-family: 'Syne', sans-serif; font-size: 18px; font-weight: 700; margin-bottom: 10px; }
+.about-text { font-size: 13px; color: var(--muted); line-height: 1.7; }
+.about-full {
+  background: var(--card); border-radius: var(--radius);
+  border: 1px solid var(--border); padding: 32px;
+  margin-top: 24px; grid-column: 1 / -1;
+}
+.about-full p { font-size: 14px; color: var(--muted); line-height: 1.8; margin-bottom: 12px; }
+.about-full p:last-child { margin-bottom: 0; }
+.about-full strong { color: var(--text); }
+
+/* ── FOOTER ── */
+footer {
+  border-top: 1px solid var(--border);
+  padding: 32px 40px; text-align: center;
+  font-size: 12px; color: var(--muted);
+}
+footer span { color: var(--accent1); transition: color 0.5s; }
+
+/* ── TRANSITIONS GLOBALES ── */
+* { transition: color 0.4s, background-color 0.4s, border-color 0.4s; }
+svg * { transition: fill 0.4s, stroke 0.4s; }
+
+/* ── SCROLL REVEAL ── */
+.reveal {
+  opacity: 0; transform: translateY(24px);
+  transition: opacity 0.6s ease, transform 0.6s ease;
+}
+.reveal.visible { opacity: 1; transform: none; }
+</style>
+</head>
+<body data-mode="none">
+
+<!-- SVG Filters -->
+<svg class="svg-filters">
+  <defs>
+    <!-- Deuteranopia -->
+    <filter id="deut">
+      <feColorMatrix type="matrix" values="
+        0.625 0.375 0   0 0
+        0.7   0.3   0   0 0
+        0     0.3   0.7 0 0
+        0     0     0   1 0"/>
+    </filter>
+    <!-- Protanopia -->
+    <filter id="prot">
+      <feColorMatrix type="matrix" values="
+        0.567 0.433 0     0 0
+        0.558 0.442 0     0 0
+        0     0.242 0.758 0 0
+        0     0     0     1 0"/>
+    </filter>
+    <!-- Tritanopia -->
+    <filter id="trit">
+      <feColorMatrix type="matrix" values="
+        0.95 0.05  0     0 0
+        0    0.433 0.567 0 0
+        0    0.475 0.525 0 0
+        0    0     0     1 0"/>
+    </filter>
+  </defs>
+</svg>
+
+<!-- NAV -->
+<nav>
+  <div class="nav-logo" onclick="scrollTo('#hero')">
+    <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
+      <ellipse cx="11" cy="11" rx="9" ry="5" stroke="currentColor" stroke-width="1.5"/>
+      <circle cx="11" cy="11" r="3.5" fill="currentColor"/>
+      <circle cx="11" cy="11" r="1.4" fill="var(--bg)"/>
+    </svg>
+    Chroma<span>Vision</span>
+  </div>
+  <div class="nav-links">
+    <a onclick="scrollTo('#selector')">Perfil</a>
+    <a onclick="scrollTo('#galeria')">Galería</a>
+    <a onclick="scrollTo('#comparador')">Comparar</a>
+    <a onclick="scrollTo('#simulador')">Simulador</a>
+    <a onclick="scrollTo('#acerca')">Acerca de</a>
+    <div class="nav-badge" id="navBadge">Visión estándar</div>
+  </div>
+</nav>
+
+<!-- ══════ HERO ══════ -->
+<section id="hero">
+  <div class="hero-bg"></div>
+  <div class="hero-eyeball reveal">
+    <svg viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="60" cy="60" r="58" stroke="var(--border)" stroke-width="1"/>
+      <circle cx="60" cy="60" r="44" stroke="var(--accent1)" stroke-width="0.8" stroke-dasharray="6 5" opacity="0.4"/>
+      <circle cx="60" cy="60" r="28" fill="rgba(123,111,255,0.12)" stroke="var(--accent1)" stroke-width="1.5"/>
+      <circle cx="60" cy="60" r="14" fill="var(--accent1)" opacity="0.85"/>
+      <circle cx="54" cy="54" r="4.5" fill="var(--bg)" opacity="0.7"/>
+      <circle cx="72" cy="48" r="3" fill="rgba(255,255,255,0.25)"/>
+    </svg>
+  </div>
+  <p class="hero-tag reveal">Plataforma educativa accesible</p>
+  <h1 class="reveal">Anatomía que <em>todos</em><br/>pueden ver</h1>
+  <p class="hero-sub reveal">Ilustraciones y recursos anatómicos adaptados automáticamente para estudiantes de medicina con daltonismo.</p>
+  <div class="hero-btns reveal">
+    <a class="btn-primary" onclick="scrollTo('#selector')">Configurar mi perfil →</a>
+    <a class="btn-ghost" onclick="scrollTo('#galeria')">Ver galería</a>
+  </div>
+  <div class="hero-stats reveal">
+    <div>
+      <div class="stat-num">8%</div>
+      <div class="stat-label">de hombres con daltonismo</div>
+    </div>
+    <div>
+      <div class="stat-num">3</div>
+      <div class="stat-label">tipos de visión soportados</div>
+    </div>
+    <div>
+      <div class="stat-num">24+</div>
+      <div class="stat-label">ilustraciones adaptadas</div>
+    </div>
+    <div>
+      <div class="stat-num">100%</div>
+      <div class="stat-label">en el navegador, sin servidor</div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════ SELECTOR ══════ -->
+<section id="selector">
+  <p class="section-tag reveal">Paso 1</p>
+  <h2 class="section-title reveal">¿Cómo ves los colores?</h2>
+  <p class="section-sub reveal">Elige tu tipo de visión. Todos los colores, ilustraciones y etiquetas de la plataforma se adaptarán automáticamente.</p>
+  <div class="mode-cards reveal">
+    <div class="mode-card mode-none active" onclick="setMode('none','Visión estándar')">
+      <div class="mode-check">✓</div>
+      <div class="mode-swatch" style="background:linear-gradient(90deg,#7b6fff,#4dffc3,#ff6fb0)"></div>
+      <div class="mode-name">Visión estándar</div>
+      <div class="mode-desc">Sin adaptación de color. Paleta completa con todos los tonos originales del contenido anatómico.</div>
+    </div>
+    <div class="mode-card mode-deut" onclick="setMode('deuteranopia','Deuteranopia')">
+      <div class="mode-check">✓</div>
+      <div class="mode-swatch" style="background:linear-gradient(90deg,#4488ff,#ffe066,#ff8c42)"></div>
+      <div class="mode-name">Deuteranopia</div>
+      <div class="mode-desc">Dificultad para distinguir rojo y verde. Se sustituyen por azul, amarillo y naranja de alto contraste.</div>
+    </div>
+    <div class="mode-card mode-prot" onclick="setMode('protanopia','Protanopia')">
+      <div class="mode-check">✓</div>
+      <div class="mode-swatch" style="background:linear-gradient(90deg,#00c2d4,#e040fb,#ffca28)"></div>
+      <div class="mode-name">Protanopia</div>
+      <div class="mode-desc">Ausencia de sensibilidad al rojo. Paleta basada en cian, magenta y amarillo brillante.</div>
+    </div>
+    <div class="mode-card mode-trit" onclick="setMode('tritanopia','Tritanopia')">
+      <div class="mode-check">✓</div>
+      <div class="mode-swatch" style="background:linear-gradient(90deg,#e53935,#43a047,#fb8c00)"></div>
+      <div class="mode-name">Tritanopia</div>
+      <div class="mode-desc">Dificultad con azul y amarillo. Se usa rojo intenso, verde puro y naranja quemado.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════ GALERÍA ══════ -->
+<section id="galeria">
+  <div class="galeria-inner">
+    <p class="section-tag reveal">Galería anatómica</p>
+    <h2 class="section-title reveal">Ilustraciones adaptadas</h2>
+    <p class="section-sub reveal">Todas las ilustraciones usan los colores de tu perfil. Filtra por tipo de estructura anatómica.</p>
+    <div class="galeria-filters reveal">
+      <div class="filter-chip active" onclick="filterGallery('all',this)">Todos</div>
+      <div class="filter-chip" onclick="filterGallery('vena',this)">Venas</div>
+      <div class="filter-chip" onclick="filterGallery('arteria',this)">Arterias</div>
+      <div class="filter-chip" onclick="filterGallery('nervio',this)">Nervios</div>
+    </div>
+    <div class="gallery-grid reveal" id="galleryGrid">
+
+      <!-- VENA CAVA -->
+      <div class="gallery-card" data-type="vena">
+        <div class="gallery-img" style="background:#0d0d22;">
+          <svg viewBox="0 0 200 180" fill="none" class="filtered">
+            <rect x="88" y="10" width="24" height="160" rx="12" fill="var(--vein)" opacity="0.9"/>
+            <ellipse cx="100" cy="10" rx="12" ry="6" fill="var(--vein)"/>
+            <path d="M88 60 Q60 80 55 110 Q50 130 65 145" stroke="var(--vein)" stroke-width="8" stroke-linecap="round" fill="none" opacity="0.6"/>
+            <path d="M112 60 Q140 80 145 110 Q150 130 135 145" stroke="var(--vein)" stroke-width="8" stroke-linecap="round" fill="none" opacity="0.6"/>
+            <circle cx="100" cy="90" r="18" fill="var(--bg)" stroke="var(--vein)" stroke-width="2" opacity="0.5"/>
+            <text x="100" y="95" font-size="9" fill="var(--vein)" text-anchor="middle" font-family="DM Sans,sans-serif" opacity="0.7">VCI</text>
+          </svg>
+        </div>
+        <div class="gallery-info">
+          <div class="gallery-type type-vena">Vena</div>
+          <div class="gallery-name">Vena Cava Inferior</div>
+          <div class="gallery-desc">Principal vena que transporta sangre desoxigenada de la parte inferior del cuerpo al corazón.</div>
+        </div>
+      </div>
+
+      <!-- ARTERIA AORTA -->
+      <div class="gallery-card" data-type="arteria">
+        <div class="gallery-img" style="background:#0d0d22;">
+          <svg viewBox="0 0 200 180" fill="none" class="filtered">
+            <path d="M100 20 Q100 60 80 80 Q60 100 60 130 Q60 155 80 165" stroke="var(--artery)" stroke-width="14" stroke-linecap="round" fill="none"/>
+            <path d="M100 20 Q130 40 148 30" stroke="var(--artery)" stroke-width="10" stroke-linecap="round" fill="none" opacity="0.7"/>
+            <path d="M100 20 Q110 50 135 55" stroke="var(--artery)" stroke-width="8" stroke-linecap="round" fill="none" opacity="0.6"/>
+            <path d="M100 20 Q95 55 120 70" stroke="var(--artery)" stroke-width="7" stroke-linecap="round" fill="none" opacity="0.5"/>
+            <circle cx="100" cy="20" r="10" fill="var(--artery)" opacity="0.4"/>
+            <text x="100" y="90" font-size="9" fill="var(--artery)" text-anchor="middle" font-family="DM Sans,sans-serif" opacity="0.6">Arco Aórtico</text>
+          </svg>
+        </div>
+        <div class="gallery-info">
+          <div class="gallery-type type-arteria">Arteria</div>
+          <div class="gallery-name">Arteria Aorta</div>
+          <div class="gallery-desc">La arteria más grande del cuerpo humano, distribuye sangre oxigenada a todo el organismo.</div>
+        </div>
+      </div>
+
+      <!-- NERVIO CIÁTICO -->
+      <div class="gallery-card" data-type="nervio">
+        <div class="gallery-img" style="background:#0d0d22;">
+          <svg viewBox="0 0 200 180" fill="none" class="filtered">
+            <path d="M100 10 L100 100 Q100 130 85 155" stroke="var(--nerve)" stroke-width="5" stroke-linecap="round" fill="none"/>
+            <path d="M100 100 Q115 130 115 160" stroke="var(--nerve)" stroke-width="4" stroke-linecap="round" fill="none" opacity="0.8"/>
+            <path d="M100 50 Q80 60 70 80" stroke="var(--nerve)" stroke-width="3" fill="none" stroke-dasharray="4 3" opacity="0.5"/>
+            <path d="M100 50 Q120 60 130 80" stroke="var(--nerve)" stroke-width="3" fill="none" stroke-dasharray="4 3" opacity="0.5"/>
+            <path d="M100 70 Q75 80 65 95" stroke="var(--nerve)" stroke-width="2.5" fill="none" stroke-dasharray="4 3" opacity="0.4"/>
+            <path d="M100 70 Q125 80 135 95" stroke="var(--nerve)" stroke-width="2.5" fill="none" stroke-dasharray="4 3" opacity="0.4"/>
+            <circle cx="100" cy="10" r="6" fill="var(--nerve)" opacity="0.7"/>
+          </svg>
+        </div>
+        <div class="gallery-info">
+          <div class="gallery-type type-nervio">Nervio</div>
+          <div class="gallery-name">Nervio Ciático</div>
+          <div class="gallery-desc">El nervio más largo y grueso del cuerpo humano, recorre desde la lumbar hasta el pie.</div>
+        </div>
+      </div>
+
+      <!-- VENA PORTA -->
+      <div class="gallery-card" data-type="vena">
+        <div class="gallery-img" style="background:#0d0d22;">
+          <svg viewBox="0 0 200 180" fill="none" class="filtered">
+            <ellipse cx="100" cy="90" rx="55" ry="40" fill="var(--vein)" opacity="0.12" stroke="var(--vein)" stroke-width="1.5"/>
+            <path d="M100 50 L100 130" stroke="var(--vein)" stroke-width="10" stroke-linecap="round"/>
+            <path d="M100 70 Q70 65 50 75 Q35 82 38 95" stroke="var(--vein)" stroke-width="7" stroke-linecap="round" fill="none" opacity="0.8"/>
+            <path d="M100 80 Q70 90 55 105" stroke="var(--vein)" stroke-width="6" stroke-linecap="round" fill="none" opacity="0.7"/>
+            <path d="M100 70 Q130 65 150 75 Q165 82 162 95" stroke="var(--vein)" stroke-width="7" stroke-linecap="round" fill="none" opacity="0.8"/>
+            <path d="M100 80 Q130 90 145 105" stroke="var(--vein)" stroke-width="6" stroke-linecap="round" fill="none" opacity="0.7"/>
+          </svg>
+        </div>
+        <div class="gallery-info">
+          <div class="gallery-type type-vena">Vena</div>
+          <div class="gallery-name">Vena Porta Hepática</div>
+          <div class="gallery-desc">Transporta sangre rica en nutrientes desde el intestino hasta el hígado para su procesamiento.</div>
+        </div>
+      </div>
+
+      <!-- ARTERIA CORONARIA -->
+      <div class="gallery-card" data-type="arteria">
+        <div class="gallery-img" style="background:#0d0d22;">
+          <svg viewBox="0 0 200 180" fill="none" class="filtered">
+            <ellipse cx="100" cy="95" rx="55" ry="65" fill="var(--artery)" opacity="0.08" stroke="var(--artery)" stroke-width="1" stroke-dasharray="3 3"/>
+            <path d="M100 30 Q98 60 90 80 Q80 105 85 130 Q88 150 100 160" stroke="var(--artery)" stroke-width="10" stroke-linecap="round" fill="none"/>
+            <path d="M100 30 Q102 60 110 80 Q120 105 115 130 Q112 150 100 160" stroke="var(--artery)" stroke-width="10" stroke-linecap="round" fill="none" opacity="0.6"/>
+            <path d="M95 95 Q75 95 65 110" stroke="var(--artery)" stroke-width="5" stroke-linecap="round" fill="none" opacity="0.5"/>
+            <path d="M105 95 Q125 95 135 110" stroke="var(--artery)" stroke-width="5" stroke-linecap="round" fill="none" opacity="0.5"/>
+          </svg>
+        </div>
+        <div class="gallery-info">
+          <div class="gallery-type type-arteria">Arteria</div>
+          <div class="gallery-name">Arterias Coronarias</div>
+          <div class="gallery-desc">Suministran sangre oxigenada al músculo cardíaco. Obstrucción causa infarto de miocardio.</div>
+        </div>
+      </div>
+
+      <!-- PLEXO BRAQUIAL -->
+      <div class="gallery-card" data-type="nervio">
+        <div class="gallery-img" style="background:#0d0d22;">
+          <svg viewBox="0 0 200 180" fill="none" class="filtered">
+            <path d="M60 20 Q85 40 100 60 Q115 80 160 100" stroke="var(--nerve)" stroke-width="3.5" stroke-linecap="round" fill="none"/>
+            <path d="M60 35 Q85 52 100 68 Q115 88 155 115" stroke="var(--nerve)" stroke-width="3" stroke-linecap="round" fill="none" opacity="0.85"/>
+            <path d="M60 50 Q82 65 100 78 Q118 95 150 128" stroke="var(--nerve)" stroke-width="2.5" stroke-linecap="round" fill="none" opacity="0.7"/>
+            <path d="M60 65 Q80 78 100 88 Q118 100 145 140" stroke="var(--nerve)" stroke-width="2" stroke-linecap="round" fill="none" opacity="0.55"/>
+            <path d="M60 78 Q80 90 100 98 Q118 108 140 152" stroke="var(--nerve)" stroke-width="1.8" stroke-linecap="round" fill="none" opacity="0.4"/>
+            <rect x="42" y="10" width="18" height="80" rx="4" fill="var(--nerve)" opacity="0.15"/>
+          </svg>
+        </div>
+        <div class="gallery-info">
+          <div class="gallery-type type-nervio">Nervio</div>
+          <div class="gallery-name">Plexo Braquial</div>
+          <div class="gallery-desc">Red nerviosa que emerge de la columna cervical e inerva todo el miembro superior.</div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- ══════ COMPARADOR ══════ -->
+<section id="comparador">
+  <p class="section-tag reveal">Modo comparación</p>
+  <h2 class="section-title reveal">Original vs. adaptado</h2>
+  <p class="section-sub reveal">Compara cómo se ve la misma ilustración con visión estándar y con tu perfil de daltonismo activo. Elige la estructura a comparar.</p>
+
+  <div class="comp-select-wrap reveal">
+    <label style="font-size:13px;color:var(--muted);">Estructura:</label>
+    <select class="comp-select" id="compSelect" onchange="updateComparador()">
+      <option value="vena">Vena Cava Inferior</option>
+      <option value="arteria">Arteria Aorta</option>
+      <option value="nervio">Nervio Ciático</option>
+    </select>
+  </div>
+
+  <div class="comparador-layout reveal">
+    <div class="comp-panel">
+      <div class="comp-header">
+        <div class="comp-dot" style="background:#7b6fff;"></div>
+        Visión estándar (original)
+      </div>
+      <div class="comp-img" id="compOriginal"></div>
+      <div class="comp-label">Paleta original sin ninguna adaptación de color.</div>
+    </div>
+    <div class="comp-panel">
+      <div class="comp-header">
+        <div class="comp-dot" style="background:var(--accent1);"></div>
+        Con tu perfil activo
+      </div>
+      <div class="comp-img" id="compFiltered"></div>
+      <div class="comp-label" id="compFilteredLabel">Ilustración con los colores adaptados a tu perfil de visión.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════ SIMULADOR ══════ -->
+<section id="simulador">
+  <div class="sim-inner">
+    <p class="section-tag reveal">Simulador de visión</p>
+    <h2 class="section-title reveal">Sube tu propia imagen</h2>
+    <p class="section-sub reveal">Carga cualquier imagen y ve cómo la percibiría una persona con cada tipo de daltonismo. Todo se procesa en tu navegador.</p>
+
+    <div class="sim-upload reveal" id="simUpload">
+      <input type="file" accept="image/*" id="simInput" onchange="handleSimImage(event)"/>
+      <div class="sim-icon">📁</div>
+      <div class="sim-upload-title">Arrastra una imagen o haz clic aquí</div>
+      <div class="sim-upload-sub">PNG, JPG o WEBP · Procesada 100% en el navegador</div>
+    </div>
+
+    <div class="sim-results" id="simResults">
+      <div class="sim-result-card">
+        <canvas id="simOriginal" class="sim-result-img"></canvas>
+        <div class="sim-result-label">Original</div>
+      </div>
+      <div class="sim-result-card">
+        <canvas id="simDeut" class="sim-result-img"></canvas>
+        <div class="sim-result-label">Deuteranopia</div>
+      </div>
+      <div class="sim-result-card">
+        <canvas id="simProt" class="sim-result-img"></canvas>
+        <div class="sim-result-label">Protanopia</div>
+      </div>
+      <div class="sim-result-card">
+        <canvas id="simTrit" class="sim-result-img"></canvas>
+        <div class="sim-result-label">Tritanopia</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════ ACERCA DE ══════ -->
+<section id="acerca">
+  <p class="section-tag reveal">Acerca de</p>
+  <h2 class="section-title reveal">El daltonismo en medicina</h2>
+  <p class="section-sub reveal">Información clave sobre cómo afecta la visión del color al aprendizaje anatómico.</p>
+
+  <div class="about-grid reveal">
+    <div class="about-card">
+      <div class="about-icon">🧬</div>
+      <div class="about-title">¿Qué es el daltonismo?</div>
+      <div class="about-text">Es una condición genética ligada al cromosoma X que afecta la percepción del color. Ocurre por la ausencia o mal funcionamiento de conos fotoreceptores en la retina.</div>
+    </div>
+    <div class="about-card">
+      <div class="about-icon">📊</div>
+      <div class="about-title">Prevalencia</div>
+      <div class="about-text">Afecta al 8% de los hombres y al 0.5% de las mujeres. En una clase de 30 estudiantes, estadísticamente 2-3 tendrán algún grado de daltonismo.</div>
+    </div>
+    <div class="about-card">
+      <div class="about-icon">🔬</div>
+      <div class="about-title">Impacto en medicina</div>
+      <div class="about-text">Los atlas anatómicos tradicionales usan rojo para arterias y azul para venas — imposible de distinguir para daltónicos. Esto crea barreras reales de aprendizaje.</div>
+    </div>
+    <div class="about-card">
+      <div class="about-icon">🎯</div>
+      <div class="about-title">Tipos soportados</div>
+      <div class="about-text"><strong>Deuteranopia:</strong> más común, sin receptores verdes. <strong>Protanopia:</strong> sin receptores rojos. <strong>Tritanopia:</strong> menos frecuente, sin receptores azules.</div>
+    </div>
+    <div class="about-full">
+      <p>Los estudiantes de medicina con daltonismo enfrentan un currículo diseñado exclusivamente para personas con visión de color estándar. Las histologías, los atlas vasculares y los esquemas de coloración histoquímica dependen de convenciones de color que resultan invisibles o confusas para quienes tienen deficiencias en la percepción del color.</p>
+      <p><strong>ChromaVision</strong> nace para eliminar esa barrera. Al adaptar automáticamente la paleta según el perfil del estudiante, garantizamos que el contenido anatómico sea igualmente accesible, permitiendo que el enfoque esté en el aprendizaje y no en descifrar colores.</p>
+      <p>Los filtros se aplican mediante matrices de transformación de color CSS/Canvas, derivadas de modelos de visión del color validados científicamente, garantizando fidelidad en la simulación de cada tipo de daltonismo.</p>
+    </div>
+  </div>
+</section>
+
+<footer>
+  Construido para estudiantes de medicina con daltonismo &nbsp;·&nbsp; <span>ChromaVision</span> &nbsp;·&nbsp; Filtros procesados 100% en el navegador
+</footer>
+
+<script>
+// ── Scroll helper
+function scrollTo(id) {
+  document.querySelector(id).scrollIntoView({ behavior: 'smooth' });
+}
+
+// ── Modo de daltonismo
+function setMode(mode, label) {
+  document.body.dataset.mode = mode;
+  document.querySelectorAll('.mode-card').forEach(c => c.classList.remove('active'));
+  event.currentTarget.classList.add('active');
+  const badge = document.getElementById('navBadge');
+  badge.textContent = label;
+  badge.classList.add('visible');
+  updateComparador();
+}
+
+// ── SVGs para comparador
+const compSVGs = {
+  vena: `<svg viewBox="0 0 200 180" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <rect x="88" y="10" width="24" height="160" rx="12" fill="COLOR_VEIN" opacity="0.9"/>
+    <ellipse cx="100" cy="10" rx="12" ry="6" fill="COLOR_VEIN"/>
+    <path d="M88 60 Q60 80 55 110 Q50 130 65 145" stroke="COLOR_VEIN" stroke-width="8" stroke-linecap="round" fill="none" opacity="0.6"/>
+    <path d="M112 60 Q140 80 145 110 Q150 130 135 145" stroke="COLOR_VEIN" stroke-width="8" stroke-linecap="round" fill="none" opacity="0.6"/>
+    <circle cx="100" cy="90" r="18" fill="#0b0b18" stroke="COLOR_VEIN" stroke-width="2" opacity="0.5"/>
+  </svg>`,
+  arteria: `<svg viewBox="0 0 200 180" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M100 20 Q100 60 80 80 Q60 100 60 130 Q60 155 80 165" stroke="COLOR_ARTERY" stroke-width="14" stroke-linecap="round" fill="none"/>
+    <path d="M100 20 Q130 40 148 30" stroke="COLOR_ARTERY" stroke-width="10" stroke-linecap="round" fill="none" opacity="0.7"/>
+    <path d="M100 20 Q110 50 135 55" stroke="COLOR_ARTERY" stroke-width="8" stroke-linecap="round" fill="none" opacity="0.6"/>
+    <path d="M100 20 Q95 55 120 70" stroke="COLOR_ARTERY" stroke-width="7" stroke-linecap="round" fill="none" opacity="0.5"/>
+    <circle cx="100" cy="20" r="10" fill="COLOR_ARTERY" opacity="0.4"/>
+  </svg>`,
+  nervio: `<svg viewBox="0 0 200 180" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M100 10 L100 100 Q100 130 85 155" stroke="COLOR_NERVE" stroke-width="5" stroke-linecap="round" fill="none"/>
+    <path d="M100 100 Q115 130 115 160" stroke="COLOR_NERVE" stroke-width="4" stroke-linecap="round" fill="none" opacity="0.8"/>
+    <path d="M100 50 Q80 60 70 80" stroke="COLOR_NERVE" stroke-width="3" fill="none" stroke-dasharray="4 3" opacity="0.5"/>
+    <path d="M100 50 Q120 60 130 80" stroke="COLOR_NERVE" stroke-width="3" fill="none" stroke-dasharray="4 3" opacity="0.5"/>
+    <circle cx="100" cy="10" r="6" fill="COLOR_NERVE" opacity="0.7"/>
+  </svg>`
+};
+
+const standardColors = {
+  vena:   { vein:'#7b6fff', artery:'#ff6fb0', nerve:'#4dffc3' },
+  arteria:{ vein:'#7b6fff', artery:'#ff6fb0', nerve:'#4dffc3' },
+  nervio: { vein:'#7b6fff', artery:'#ff6fb0', nerve:'#4dffc3' }
+};
+
+const modeColors = {
+  none:        { vein:'#7b6fff', artery:'#ff6fb0', nerve:'#4dffc3' },
+  deuteranopia:{ vein:'#4488ff', artery:'#ff8c42', nerve:'#ffe066' },
+  protanopia:  { vein:'#00c2d4', artery:'#ffca28', nerve:'#e040fb' },
+  tritanopia:  { vein:'#e53935', artery:'#fb8c00', nerve:'#43a047' }
+};
+
+function getSVG(type, colors) {
+  return compSVGs[type]
+    .replace(/COLOR_VEIN/g, colors.vein)
+    .replace(/COLOR_ARTERY/g, colors.artery)
+    .replace(/COLOR_NERVE/g, colors.nerve);
+}
+
+function updateComparador() {
+  const type = document.getElementById('compSelect').value;
+  const mode = document.body.dataset.mode || 'none';
+  const std = standardColors[type];
+  const adapted = modeColors[mode];
+  document.getElementById('compOriginal').innerHTML = getSVG(type, std);
+  document.getElementById('compFiltered').innerHTML = getSVG(type, adapted);
+  const labels = { none:'Visión estándar (igual al original)', deuteranopia:'Paleta adaptada para Deuteranopia', protanopia:'Paleta adaptada para Protanopia', tritanopia:'Paleta adaptada para Tritanopia' };
+  document.getElementById('compFilteredLabel').textContent = labels[mode] + ' — los colores se distinguen claramente con tu tipo de visión.';
+}
+
+updateComparador();
+
+// ── Galería filter
+function filterGallery(type, el) {
+  document.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
+  el.classList.add('active');
+  document.querySelectorAll('.gallery-card').forEach(card => {
+    card.style.display = (type === 'all' || card.dataset.type === type) ? '' : 'none';
+  });
+}
+
+// ── Simulador de visión con Canvas
+const matrices = {
+  deut: [0.625,0.375,0,0, 0.7,0.3,0,0, 0,0.3,0.7,0],
+  prot: [0.567,0.433,0,0, 0.558,0.442,0,0, 0,0.242,0.758,0],
+  trit: [0.95,0.05,0,0, 0,0.433,0.567,0, 0,0.475,0.525,0]
+};
+
+function applyMatrix(imageData, mat) {
+  const d = imageData.data;
+  for (let i = 0; i < d.length; i += 4) {
+    const r = d[i], g = d[i+1], b = d[i+2];
+    d[i]   = r*mat[0] + g*mat[1] + b*mat[2];
+    d[i+1] = r*mat[4] + g*mat[5] + b*mat[6];
+    d[i+2] = r*mat[8] + g*mat[9] + b*mat[10];
+  }
+  return imageData;
+}
+
+function handleSimImage(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const img = new Image();
+  const url = URL.createObjectURL(file);
+  img.onload = () => {
+    const W = 400, H = Math.round(img.height * W / img.width);
+    ['simOriginal','simDeut','simProt','simTrit'].forEach(id => {
+      const c = document.getElementById(id);
+      c.width = W; c.height = H;
+    });
+    // Original
+    const ctxO = document.getElementById('simOriginal').getContext('2d');
+    ctxO.drawImage(img, 0, 0, W, H);
+    // Deuteranopia
+    ['Deut','Prot','Trit'].forEach(t => {
+      const ctx = document.getElementById('sim'+t).getContext('2d');
+      ctx.drawImage(img, 0, 0, W, H);
+      const imgData = ctx.getImageData(0, 0, W, H);
+      ctx.putImageData(applyMatrix(imgData, matrices[t.toLowerCase()]), 0, 0);
+    });
+    document.getElementById('simResults').classList.add('visible');
+    URL.revokeObjectURL(url);
+  };
+  img.src = url;
+}
+
+// ── Scroll reveal
+const observer = new IntersectionObserver((entries) => {
+  entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add('visible'); } });
+}, { threshold: 0.1 });
+document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
+</script>
+</body>
+</html>
